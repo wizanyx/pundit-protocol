@@ -16,21 +16,21 @@ class ChaosEngine:
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
         self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
 
+    # In chaos.py or news_fetcher.py
     def _get_raw_context(self, query):
-        """Step 1: Ingest Facts via Tavily"""
-        news = self.tavily.search(query=query, search_depth="advanced", max_results=5)
-        results = news.get('results', [])
+        # Call your new function instead of Tavily
+        articles = search_news(query, limit=5)
         
-        news_text = "\n".join([f"FACT: {r['content']}" for r in results])
+        # Map 'snippet' (from NewsAPI) to 'FACT' (for the AI)
+        news_text = "\n".join([f"FACT: {a['snippet']}" for a in articles if a['snippet']])
         
-        # Calculate an average relevance score (0.0 to 1.0)
-        relevance = sum([r.get('score', 0) for r in results]) / max(len(results), 1)
-        
+        # NewsAPI doesn't give a 'relevance score' (0.0-1.0) like Tavily does.
+        # We will fake it as 0.8 so the temperature calculation still works.
         return {
             "news": news_text,
-            "relevance": relevance
+            "relevance": 0.8 
         }
-
+    
     def _calculate_temp(self, relevance):
         """Step 2: Determine Sanity (Higher relevance = Higher Heat)"""
         # Logic: If the news is highly relevant/trending, we push the AI to be more radical
