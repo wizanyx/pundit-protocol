@@ -146,6 +146,12 @@ const TRENDING_TOPICS = [
   "TikTok Divestment"
 ];
 
+const ACTS = [
+  { id: 1, label: "Briefing" },
+  { id: 2, label: "Debate" },
+  { id: 3, label: "Synthesis" },
+];
+
 const agentMetadata: Agent[] = [
   { name: "The Contrarian", color: "border-rose-500", bg: "bg-rose-900/20", text: "text-rose-400", logo: null, initials: "C" },
   { name: "The Hype Man", color: "border-blue-500", bg: "bg-blue-900/20", text: "text-blue-400", logo: null, initials: "H" },
@@ -605,12 +611,46 @@ export default function PunditProtocolPage() {
 
         {/* Main Content Area */}
         <section className="w-full max-w-3xl flex flex-col gap-6 px-4 pb-24">
+          <div className="w-full">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {ACTS.map((act) => {
+                const isActive = currentAct === act.id;
+                const isDone = currentAct > act.id;
+                return (
+                  <div
+                    key={act.id}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all duration-300
+                      ${isActive
+                        ? "bg-indigo-500/20 text-indigo-200 border-indigo-400 shadow-[0_0_16px_rgba(99,102,241,0.6)]"
+                        : isDone
+                        ? "bg-emerald-500/10 text-emerald-200 border-emerald-600/40"
+                        : "bg-zinc-900/40 text-zinc-500 border-zinc-800"}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isActive ? "bg-indigo-400 animate-pulse" : isDone ? "bg-emerald-400" : "bg-zinc-600"}`} />
+                    <span>{`Act ${act.id}: ${act.label}`}</span>
+                    {isActive && (
+                      <span className="text-[8px] px-2 py-0.5 rounded-full bg-indigo-400/20 text-indigo-200 border border-indigo-400/30">
+                        Live
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {currentAct >= 1 && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6 flex flex-col gap-3">
-              <span className="font-mono text-[10px] font-bold uppercase text-blue-400 tracking-widest">Briefing & Spin-Up</span>
-              <p className="text-md text-zinc-300 leading-relaxed min-h-[3rem]">
+            <div className="relative animate-in fade-in slide-in-from-bottom-4 duration-700 w-full bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6 flex flex-col gap-3 overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-blue-500/60 via-indigo-500/60 to-cyan-400/60" />
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] font-bold uppercase text-blue-400 tracking-widest">Briefing & Spin-Up</span>
+                <span className={`text-[9px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full border ${currentAct === 1 ? "border-blue-500/40 text-blue-300 bg-blue-900/20" : "border-zinc-800 text-zinc-500 bg-zinc-900/40"}`}>
+                  Act 1
+                </span>
+              </div>
+              <div className="text-[13px] text-zinc-200 leading-6 min-h-[3rem] whitespace-pre-wrap">
                 <Typewriter text={moderatorBrief} speedMs={BASE_TYPE_SPEED / speedMultiplier} />
-              </p>
+              </div>
               
               <AgentTelemetry isActive={isAnalyzing} speedMultiplier={speedMultiplier} hasError={backendError} />
             </div>
@@ -687,16 +727,33 @@ export default function PunditProtocolPage() {
           )}
 
           {currentAct >= 3 && (
-            <div className="animate-in fade-in zoom-in-95 duration-700 w-full bg-zinc-900/40 border border-zinc-800 rounded-2xl p-8 flex flex-col gap-4">
-              <span className="font-mono text-[10px] font-bold uppercase text-green-400 tracking-widest">Synthesis</span>
-              <p className="text-md text-zinc-200 leading-relaxed">
+            <div className="relative animate-in fade-in zoom-in-95 duration-700 w-full bg-zinc-900/40 border border-zinc-800 rounded-2xl p-8 flex flex-col gap-4 overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-emerald-500/60 via-lime-400/60 to-teal-400/60" />
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] font-bold uppercase text-green-400 tracking-widest">Synthesis</span>
+                <span className={`text-[9px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full border ${currentAct === 3 ? "border-emerald-500/40 text-emerald-300 bg-emerald-900/20" : "border-zinc-800 text-zinc-500 bg-zinc-900/40"}`}>
+                  Act 3
+                </span>
+              </div>
+              <div className="text-[13px] text-zinc-200 leading-6 whitespace-pre-wrap">
                 <Typewriter text={moderatorSynthesis} speedMs={BASE_TYPE_SPEED / speedMultiplier} />
-              </p>
+              </div>
               {citedSources.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {citedSources.map((src, i) => (
-                    <a key={i} href={src.url} target="_blank" className="text-[10px] font-mono text-zinc-500 hover:text-indigo-400 transition-colors bg-zinc-950/50 px-2 py-1 rounded border border-zinc-800">
-                      {src.title}
+                    <a
+                      key={i}
+                      href={src.url}
+                      target="_blank"
+                      className="group w-full sm:w-[calc(50%-0.25rem)] text-[11px] font-mono text-zinc-300 transition-all bg-zinc-950/60 px-3 py-2 rounded-lg border border-zinc-800 hover:border-indigo-500/60 hover:bg-indigo-950/30"
+                    >
+                      <div className="line-clamp-2">{src.title}</div>
+                      <div className="mt-1 text-[10px] text-zinc-500 flex items-center justify-between">
+                        <span>See full article --&gt;</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-300">
+                          Visit site
+                        </span>
+                      </div>
                     </a>
                   ))}
                 </div>

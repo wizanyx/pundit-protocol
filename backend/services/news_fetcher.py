@@ -3,6 +3,7 @@ import json
 from typing import Any, Dict, List
 from pathlib import Path
 
+import re
 import requests
 from dotenv import load_dotenv
 
@@ -11,6 +12,31 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 NEWS_API_URL = os.getenv("NEWS_API_URL", "https://newsapi.org/v2/everything")
+
+STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "if", "then", "so", "of", "to", "in", "on",
+    "for", "with", "by", "about", "as", "at", "is", "are", "was", "were", "be", "been",
+    "being", "it", "this", "that", "these", "those", "from", "my", "your", "our", "their",
+    "his", "her", "its", "i", "you", "we", "they", "he", "she", "them", "me", "us",
+}
+
+
+def _topic_keywords(topic: str) -> list[str]:
+    words = re.findall(r"[a-zA-Z0-9']+", (topic or "").lower())
+    return [w for w in words if len(w) >= 3 and w not in STOPWORDS]
+
+
+def _matches_topic(item: Dict[str, Any], keywords: list[str]) -> bool:
+    if not keywords:
+        return True
+    hay = " ".join(
+        [
+            item.get("title") or "",
+            item.get("description") or "",
+            item.get("content") or "",
+        ]
+    ).lower()
+    return any(k in hay for k in keywords)
 
 def _get_newsapi_key() -> str:
     # Check both common naming conventions
@@ -54,6 +80,15 @@ def search_news(topic: str, limit: int = 5, language: str = "en") -> List[Dict[s
     articles = payload.get("articles", [])
     if not isinstance(articles, list):
         return []
+
+    # 3.5 Topic filter to avoid irrelevant headlines
+    keywords = _topic_keywords(topic)
+    if keywords:
+        filtered = [item for item in articles if _matches_topic(item, keywords)]
+        if filtered:
+            articles = filtered
+        else:
+            return []
 
     results: List[Dict[str, Any]] = []
     for item in articles[:limit]:

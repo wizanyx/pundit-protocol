@@ -30,12 +30,112 @@ MAX_DEBATE_ROUNDS = max(1, int(os.getenv("DEBATE_ROUNDS", "2")))
 _debate_state: dict[str, Any] | None = None
 
 
-def _stub_conclusion(topic: str, history: list[dict[str, Any]]) -> str:
-    speakers = [h.get("speaker", "?") for h in history[-6:]]
-    return (
-        f"Synthesis for “{topic}”: the panel surfaced competing frames from {', '.join(speakers)}. "
-        "No single narrative dominated; readers should weigh evidence and incentives across rounds."
-    )
+def _first_sentence(text: str) -> str:
+    if not text:
+        return ""
+    cleaned = text.replace("\n", " ").strip()
+    # Remove common lead labels to keep summaries clean.
+    prefixes = [
+        "Investor lens:", "Distribution lens:", "Populist lens:", "Contrarian lens:",
+        "Bull case:", "Class lens:", "Risk lens:", "Lens:", "Bottom line:", "Demand:",
+        "Verdict:", "Risk:", "Upside:", "Power:", "Takeaway:", "Rebuttal:"
+    ]
+    for p in prefixes:
+        if cleaned.startswith(p):
+            cleaned = cleaned[len(p):].strip()
+            break
+    parts = cleaned.split(".")
+    return parts[0].strip() if parts else cleaned
+
+
+def _theme_from_text(text: str) -> str | None:
+    t = (text or "").lower()
+    if "investor lens:" in t or "market" in t or "capital allocation" in t:
+        return "Market-focused view emphasized stability and credibility."
+    if "distribution lens:" in t or "household" in t or "burden" in t:
+        return "Distributional view stressed who bears the costs."
+    if "populist lens:" in t or "main street" in t or "elite" in t:
+        return "Populist view framed it as elite spin versus families."
+    if "contrarian lens:" in t or "fragility" in t or "misprice" in t:
+        return "Contrarian view warned hidden risks are being masked."
+    if "bull case:" in t or "momentum" in t or "upside" in t:
+        return "Bull case argued momentum and upside are underestimated."
+    if "class lens:" in t or "labor" in t or "workers" in t:
+        return "Class view focused on power dynamics and labor costs."
+    if "risk lens:" in t or "second-order" in t or "risk management" in t:
+        return "Analytical view highlighted second‑order effects and risk management."
+    return None
+
+
+def _build_summary(
+    topic: str,
+    history: list[dict[str, Any]],
+    articles_json: str,
+) -> str:
+    # Pull 2 headline anchors if available
+    headlines: list[str] = []
+    try:
+        sources = json.loads(articles_json) if articles_json else []
+        if isinstance(sources, list):
+            for item in sources[:2]:
+                title = (item.get("title") or "").strip()
+                if title:
+                    headlines.append(title)
+    except json.JSONDecodeError:
+        headlines = []
+
+    # Extract themes from up to 3 unique speakers (most recent round)
+    seen = set()
+    takes: list[str] = []
+    themes: list[str] = []
+    for h in reversed(history):
+        sp = h.get("speaker") or "Panelist"
+        if sp in seen:
+            continue
+        seen.add(sp)
+        raw = h.get("text") or ""
+        tx = _first_sentence(raw)
+        if tx:
+            takes.append(tx)
+        theme = _theme_from_text(raw)
+        if theme and theme not in themes:
+            themes.append(theme)
+        if len(takes) >= 3:
+            break
+    takes.reverse()
+
+    topic_clean = (topic or "").strip()
+    topic_phrase = topic_clean if topic_clean else "the topic"
+
+    intro_templates = [
+        f"Panel snapshot on “{topic_phrase}”:",
+        f"Debate summary — “{topic_phrase}”:",
+        f"Where the panel landed on “{topic_phrase}”:",
+    ]
+    intro = intro_templates[abs(hash(topic_phrase)) % len(intro_templates)]
+
+    parts: list[str] = [intro]
+    if themes:
+        parts.append(" ".join(themes[:3]))
+    elif takes:
+        joined_takes = ". ".join(takes)
+        if not joined_takes.endswith("."):
+            joined_takes += "."
+        parts.append(joined_takes)
+    else:
+        parts.append("The panel debated divergent risks and incentives.")
+    if headlines:
+        parts.append("News anchors: " + "; ".join(headlines) + ".")
+
+    takeaway_templates = [
+        f"Net takeaway: {topic_phrase} is contested; watch incentives, second‑order effects, and credibility signals.",
+        f"Net takeaway: on {topic_phrase}, near‑term headlines matter less than structural signals and follow‑through.",
+        f"Net takeaway: the debate on {topic_phrase} splits on risk vs. upside; expect volatility around key signals.",
+        f"Net takeaway: {topic_phrase} hinges on execution and trust, not just messaging.",
+    ]
+    idx = abs(hash(topic_phrase)) % len(takeaway_templates)
+    parts.append(takeaway_templates[idx])
+    return " ".join(parts)
 
 
 async def _broadcast_round(ctx: Context, state: dict[str, Any]) -> None:
@@ -134,7 +234,7 @@ async def collect_arguments(ctx: Context, sender: str, msg: Argument):
     state["pending"] = []
 
     if state["round_index"] >= state["max_rounds"]:
-        conclusion = _stub_conclusion(state["topic"], state["history"])
+        conclusion = _build_summary(state["topic"], state["history"], state["articles_json"])
         debate_queue.put(
             {
                 "type": "summary",
