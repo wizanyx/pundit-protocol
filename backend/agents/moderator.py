@@ -8,7 +8,7 @@ from .local_resolver import LocalResolver
 
 from .messages import Argument, DebateBrief
 
-try:
+if __package__:
     from ..services.briefing import articles_from_json, build_overview_from_articles
     from ..services.config import DEBATE_ROUNDS
     from ..services.debate_engine import (
@@ -24,7 +24,7 @@ try:
     )
     from ..services.events import overview_event, summary_event, turn_event
     from ..services.llm import call_llm_text
-except ImportError:
+else:
     from services.briefing import articles_from_json, build_overview_from_articles
     from services.config import DEBATE_ROUNDS
     from services.debate_engine import (

@@ -2,14 +2,14 @@ import json
 
 from uagents import Agent, Context, Bureau
 
-try:
+if __package__:
     from ..services.debate_context import build_context_snippets
     from ..services.briefing import articles_from_json
     from ..services.llm import call_llm_text
     from .messages import Argument, DebateTurn
     from .personas import resolve_personality
     from .local_resolver import LocalResolver
-except ImportError:
+else:
     # Allow running from backend/ with non-package imports
     from services.debate_context import build_context_snippets
     from services.briefing import articles_from_json

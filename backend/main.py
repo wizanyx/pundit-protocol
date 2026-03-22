@@ -25,7 +25,7 @@ sys.path = [p for p in sys.path if not os.path.normpath(p).endswith(_COSMPY_PROT
 
 from uagents.communication import send_message
 
-try:
+if __package__:
     from .agents.moderator import moderator, debate_queue
     from .agents.pundit import create_bureau
     from .agents.messages import DebateBrief
@@ -39,7 +39,7 @@ try:
         build_overview_from_articles,
         fetch_articles_for_topic,
     )
-except ImportError:
+else:
     # Allow running from backend/ with: uvicorn main:app
     from agents.moderator import moderator, debate_queue
     from agents.pundit import create_bureau

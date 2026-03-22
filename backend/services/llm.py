@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Shared LLM gateway for backend agents.
 
 This module centralizes provider selection and fallback behavior:
@@ -7,7 +5,10 @@ This module centralizes provider selection and fallback behavior:
 - LLM_PROVIDER=gemini (default) -> Gemini first, then OpenAI fallback.
 """
 
+from __future__ import annotations
+
 import importlib
+import os
 from typing import Any
 
 try:
