@@ -26,12 +26,8 @@ class DebateTurn(Model):
 
 
 class Argument(Model):
+    """Pundit -> moderator: one debate turn text with optional citation link."""
+
     speaker: str
     text: str
     source_link: str | None = None
-
-
-class DebateSummary(Model):
-    topic: str
-    arguments: list[Argument]
-    conclusion: str

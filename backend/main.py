@@ -32,6 +32,8 @@ try:
     from .agents.personas import DEFAULT_SOURCE_SLOTS
     from .agents.local_resolver import LocalResolver
     from .schemas import DebateStartBody, DebateStartResponse
+    from .services.config import DEBATE_QUEUE_TIMEOUT
+    from .services.events import error_event
     from .services.briefing import (
         articles_to_json,
         build_overview_from_articles,
@@ -45,6 +47,8 @@ except ImportError:
     from agents.personas import DEFAULT_SOURCE_SLOTS
     from agents.local_resolver import LocalResolver
     from schemas import DebateStartBody, DebateStartResponse
+    from services.config import DEBATE_QUEUE_TIMEOUT
+    from services.events import error_event
     from services.briefing import (
         articles_to_json,
         build_overview_from_articles,
@@ -53,7 +57,7 @@ except ImportError:
 
 LOCAL_RESOLVER = LocalResolver(default_endpoint="http://127.0.0.1:8000/submit")
 
-DEBATE_GET_TIMEOUT = float(os.getenv("DEBATE_QUEUE_TIMEOUT", "120"))
+DEBATE_GET_TIMEOUT = DEBATE_QUEUE_TIMEOUT
 
 app = FastAPI()
 
@@ -135,6 +139,18 @@ async def start_debate(body: DebateStartBody):
     await _drain_debate_queue()
     brief, overview, articles = await asyncio.to_thread(_build_debate_brief, body)
     await send_message(moderator.address, brief, resolver=LOCAL_RESOLVER)
+
+    try:
+        event = await _get_next_event()
+        if event.get("type") == "overview":
+            overview = event.get("overview") or overview
+            evt_sources = event.get("sources")
+            if isinstance(evt_sources, list):
+                articles = evt_sources
+    except HTTPException:
+        # If moderator event times out, keep deterministic fallback response.
+        pass
+
     return DebateStartResponse(
         overview=overview,
         sources=articles,
@@ -169,11 +185,7 @@ async def websocket_debate(websocket: WebSocket):
                     event = await _get_next_event()
                 except HTTPException as exc:
                     await websocket.send_json(
-                        {
-                            "type": "error",
-                            "error": exc.detail,
-                            "status_code": exc.status_code,
-                        }
+                        error_event(detail=exc.detail, status_code=exc.status_code)
                     )
                     break
                 await websocket.send_json(event)
