@@ -1,4 +1,0 @@
-fastapi
-uagents
-uvicorn
-requests
