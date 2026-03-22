@@ -4,7 +4,6 @@ import json
 from tavily import TavilyClient
 from openai import OpenAI
 import google.generativeai as genai
-# At the very top of chaos.py
 from news_fetcher import search_news
 
 class ChaosEngine:
