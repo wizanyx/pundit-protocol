@@ -1,31 +1,32 @@
 import os
-from typing import Any, Dict, List
 import json
+from typing import Any, Dict, List
+from pathlib import Path
 
 import requests
+from dotenv import load_dotenv
+
+# Force load the .env file from the current directory
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 NEWS_API_URL = os.getenv("NEWS_API_URL", "https://newsapi.org/v2/everything")
 
-
 def _get_newsapi_key() -> str:
+    # Check both common naming conventions
     key = os.getenv("NEWSAPI_KEY") or os.getenv("NEWS_API_KEY")
     if not key:
         raise ValueError(
-            "Missing NewsAPI key. Set NEWSAPI_KEY or NEWS_API_KEY in your environment."
+            "Missing NewsAPI key. Set NEWSAPI_KEY in your .env file."
         )
     return key
 
-
 def search_news(topic: str, limit: int = 5, language: str = "en") -> List[Dict[str, Any]]:
     """Search NewsAPI for a topic and return normalized results."""
+    
+    # 1. Validation
     if not topic.strip():
-        raise ValueError("The 'topic' parameter cannot be empty.")
-
-    if not isinstance(limit, int) or limit <= 0:
-        raise ValueError("The 'limit' parameter must be a positive integer.")
-
-    if not isinstance(language, str) or len(language) != 2:
-        raise ValueError("The 'language' parameter must be a valid ISO 639-1 code (e.g., 'en').")
+        return [] # Return empty instead of crashing the whole engine
 
     api_key = _get_newsapi_key()
 
@@ -37,37 +38,45 @@ def search_news(topic: str, limit: int = 5, language: str = "en") -> List[Dict[s
         "apiKey": api_key,
     }
 
+    # 2. Network Request
     try:
-        resp = requests.get(NEWS_API_URL, params=params, timeout=15)
-        resp.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
-    except requests.exceptions.Timeout:
-        raise RuntimeError("NewsAPI request timed out")
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"NewsAPI request failed: {str(e)}")
-
-    try:
+        resp = requests.get(NEWS_API_URL, params=params, timeout=10)
+        resp.raise_for_status()
         payload = resp.json()
+    except requests.exceptions.RequestException as e:
+        print(f"NewsAPI Warning: Request failed ({e})")
+        return []
     except json.JSONDecodeError:
-        raise RuntimeError("Failed to decode NewsAPI response as JSON")
+        print("NewsAPI Warning: Failed to decode JSON")
+        return []
 
-    articles = payload.get("articles")
+    # 3. Data Normalization
+    articles = payload.get("articles", [])
     if not isinstance(articles, list):
-        raise RuntimeError("Invalid NewsAPI response: 'articles' is missing or not a list")
+        return []
 
     results: List[Dict[str, Any]] = []
     for item in articles[:limit]:
-        source = item.get("source") or {}
-        results.append(
-            {
-                "title": item.get("title") or "No title available",
-                "url": item.get("url") or "No URL available",
-                "source": source.get("name") or "Unknown source",
-                "published_at": item.get("publishedAt"),
-                "snippet": item.get("description") or item.get("content") or "No content available",
-            }
-        )
-
-    if not results:
-        raise RuntimeError("No articles found in NewsAPI response")
+        # Clean the snippet: Prefer description, fallback to content, remove [...]
+        raw_snippet = item.get("description") or item.get("content") or ""
+        clean_snippet = raw_snippet.split(" [+")[0] # Removes the " [+123 chars]" suffix
+        
+        results.append({
+            "title": item.get("title") or "No title",
+            "url": item.get("url") or "#",
+            "source": (item.get("source") or {}).get("name") or "Unknown",
+            "published_at": item.get("publishedAt"),
+            "snippet": clean_snippet or "No content available"
+        })
 
     return results
+
+if __name__ == "__main__":
+    # Test block to verify it works independently
+    try:
+        test_results = search_news("Silicon Valley Bank", limit=2)
+        print(f"Successfully fetched {len(test_results)} articles.")
+        for r in test_results:
+            print(f"- {r['title']} ({r['source']})")
+    except Exception as e:
+        print(f"Test Failed: {e}")
